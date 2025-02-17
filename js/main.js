@@ -49,13 +49,12 @@ function fetchGeoJSONData(mymap) {
             return response.json();
         })
         .then(data => {
-            // Some of the data is less then 0 or 0 so I filtered those out.
+            // Some of the data is less than 0 or 0, so I filtered those out.
             const top100Features = data.features.filter(feature => feature.properties.mag > 0).slice(0, 100);
             const minMag = Math.min(...top100Features.map(feature => feature.properties.mag));
             // console.log('Top 100 features:', top100Features);  FOR DEBUG
-            addGeoJSONLayer(mymap, top100Features, minMag);
-            var attributes = processData(top100Features);
-            createSequenceControls();
+            const attributes = processData(top100Features);
+            createSequenceControls(mymap, top100Features, minMag, attributes);
         })
         .catch(error => {
             // Handle errors related to loading the GeoJSON file
@@ -67,48 +66,48 @@ function fetchGeoJSONData(mymap) {
         });
 }
 
-function processData(top100Features){
+function processData(top100Features) {
     //get the magnitude values
-    var magnitudes = top100Features.map(feature => feature.properties.mag);
+    const magnitudes = top100Features.map(feature => feature.properties.mag);
 
     //calculate the quantiles
-    var quantiles = [];
+    const quantiles = [];
     for (var i = 1; i <= 8; i++) {
         quantiles.push(percentile(magnitudes, i / 8 * 100));
     }
 
     //create the bins
-    var bins = [];
+    var magBins = [];
     for (var i = 0; i < 8; i++) {
-        bins.push({
+        magBins.push({
             min: quantiles[i],
             max: quantiles[i + 1] || Infinity,
             values: []
         });
     }
 
-    //assign the data to the bins
+    //assign the data to the mag bins
     magnitudes.forEach(magnitude => {
         for (var i = 0; i < 8; i++) {
-            if (magnitude >= bins[i].min && magnitude < bins[i].max) {
-                bins[i].values.push(magnitude);
+            if (magnitude >= magBins[i].min && magnitude < magBins[i].max) {
+                magBins[i].values.push(magnitude);
                 break;
             }
         }
     });
 
     //check result
-    console.log(bins);
+    console.log(magBins);
 
-    return bins;
+    return magBins;
 }
 
 //calculate the percentile
 function percentile(arr, p) {
     arr.sort((a, b) => a - b);
-    var index = (arr.length - 1) * p / 100;
-    var lower = Math.floor(index);
-    var upper = Math.ceil(index);
+    let index = (arr.length - 1) * p / 100;
+    let lower = Math.floor(index);
+    let upper = Math.ceil(index);
     if (upper - lower === 1) {
         return arr[lower];
     } else {
@@ -124,9 +123,9 @@ function addGeoJSONLayer(mymap, features, minMag) {
             const mag = feature.properties.mag;
             //console.log('mag:', mag); FOR DEBUG
             //console.log('minMag:', minMag); FOR DEBUG
-            const radius = Math.max(1.0083 * Math.pow(mag/minMag, 0.5715), 5);
+            const radius = Math.max(1.0083 * Math.pow(mag / minMag, 0.5715), 5);
             //console.log('radius:', radius); FOR DEBUG
-            const color = mag > 5 ? 'red' : mag > 3 ? 'orange' : 'yellow';
+            const color = mag > 5 ? 'darkred' : mag > 4 ? 'red' : mag > 3 ? 'orangered' : mag > 2 ? 'darkorange' : mag > 1 ? 'orange' : 'yellow';
             //console.log(radius); FOR DEBUG
 
             // Create a circle marker with properties based on the magnitude
@@ -149,7 +148,7 @@ function addGeoJSONLayer(mymap, features, minMag) {
                      <strong>Time:</strong> ${new Date(feature.properties.time).toLocaleString()}<br>
                      <a href="${feature.properties.url}" target="_blank">More Info</a>`,
                     {
-                        offset: new L.Point(0, -layer.options.radius/3)
+                        offset: new L.Point(0, -layer.options.radius / 3)
                     }
                 );
             }
@@ -157,36 +156,114 @@ function addGeoJSONLayer(mymap, features, minMag) {
     }).addTo(mymap);
 }
 
-function createSequenceControls() {
-    // Add event listener to slider
-    var sliderElement = document.querySelector(".range-slider");
-    sliderElement.max = 8;
+// Create sequence controls for the map
+function createSequenceControls(mymap, top100Features, minMag, attributes) {
+    // Get the slider and bucket range elements
+    const sliderElement = document.querySelector(".range-slider");
+    const bucketRangeElement = document.querySelector(".magnituderange");
+    const circleLayerGroup = L.layerGroup().addTo(mymap);
+    const showAllEarthquakesCheckbox = document.querySelector("#showalleqs");
+
+    // Initialize the slider
+    initializeSlider(sliderElement, attributes);
+
+    // Add event listeners to the slider and arrow buttons
+    addEventListeners(sliderElement, circleLayerGroup, bucketRangeElement, top100Features, minMag, attributes);
+
+    // Update the bucket range text initially
+    updateMagnitudeRangeText(sliderElement, bucketRangeElement, attributes);
+
+    // Add initial circle layers to the map
+    const initialBin = attributes[0];
+    const initialFilteredFeatures = top100Features.filter(feature => initialBin.values.includes(feature.properties.mag));
+    addGeoJSONLayer(circleLayerGroup, initialFilteredFeatures, minMag);
+
+    // Remove initial circle layers when slider is moved
+    sliderElement.addEventListener("input", () => {
+        if (!showAllEarthquakesCheckbox.checked) {
+            circleLayerGroup.clearLayers();
+            const value = sliderElement.value;
+            const bin = attributes[value % attributes.length];
+            const filteredFeatures = top100Features.filter(feature => bin.values.includes(feature.properties.mag));
+            addGeoJSONLayer(circleLayerGroup, filteredFeatures, minMag);
+        }
+    });
+
+    // Show all earthquakes when checkbox is checked
+    showAllEarthquakesCheckbox.addEventListener("change", () => {
+        if (showAllEarthquakesCheckbox.checked) {
+            circleLayerGroup.clearLayers();
+            addGeoJSONLayer(circleLayerGroup, top100Features, minMag);
+        } else {
+            circleLayerGroup.clearLayers();
+            const value = sliderElement.value;
+            const bin = attributes[value % attributes.length];
+            const filteredFeatures = top100Features.filter(feature => bin.values.includes(feature.properties.mag));
+            addGeoJSONLayer(circleLayerGroup, filteredFeatures, minMag);
+        }
+    });
+}
+
+// Initialize the slider element
+function initializeSlider(sliderElement, attributes) {
+    // Set the slider's max, min, value, and step
+    sliderElement.max = attributes.length - 1;
     sliderElement.min = 0;
     sliderElement.value = 0;
     sliderElement.step = 1;
+}
 
-    sliderElement.addEventListener("input", function() {
-      // Update the map based on the slider value
-      var value = this.value;
-      console.log("Slider value:", value);
-      // TO DO: update the map based on the slider value
+// Add event listeners to the slider and arrow buttons
+function addEventListeners(sliderElement, circleLayerGroup, bucketRangeElement, top100Features, minMag, attributes) {
+    // Add event listener to the slider
+    sliderElement.addEventListener("input", () => {
+        // Get the current slider value and corresponding bin
+        const value = sliderElement.value;
+        const bin = attributes[value % attributes.length];
+
+        // Filter features based on the bin's values
+        const filteredFeatures = top100Features.filter(feature => bin.values.includes(feature.properties.mag));
+
+        // Clear the circle layer group and add new circle layers
+        circleLayerGroup.clearLayers();
+        addGeoJSONLayer(circleLayerGroup, filteredFeatures, minMag);
+
+        // Update the bucket range text
+        updateMagnitudeRangeText(sliderElement, bucketRangeElement, attributes);
     });
-  
-    // Add event listener to step backward button
-    var leftArrowElement = document.querySelector("#leftArrow");
-    leftArrowElement.addEventListener("click", function() {
-      var currentValue = sliderElement.value;
-      sliderElement.value = parseInt(currentValue) - 1;
-      console.log("Slider value:", sliderElement.value);
-      // TO DO: update the map based on the slider value
+
+    // Add event listener to the left arrow button
+    const leftArrowElement = document.querySelector("#leftArrow");
+    leftArrowElement.addEventListener("click", () => {
+        // Decrement the slider value and update the circle layers and bucket range text
+        const currentValue = sliderElement.value;
+        sliderElement.value = (parseInt(currentValue) - 1 + attributes.length) % attributes.length;
+        const bin = attributes[sliderElement.value];
+        const filteredFeatures = top100Features.filter(feature => bin.values.includes(feature.properties.mag));
+        circleLayerGroup.clearLayers();
+        addGeoJSONLayer(circleLayerGroup, filteredFeatures, minMag);
+        updateMagnitudeRangeText(sliderElement, bucketRangeElement, attributes);
     });
-  
-    // Add event listener to step forward button
-    var rightArrowElement = document.querySelector("#rightArrow");
-    rightArrowElement.addEventListener("click", function() {
-      var currentValue = sliderElement.value;
-      sliderElement.value = parseInt(currentValue) + 1;
-      console.log("Slider value:", sliderElement.value);
-      // TO DO: update the map based on the slider value
+
+    // Add event listener to the right arrow button
+    const rightArrowElement = document.querySelector("#rightArrow");
+    rightArrowElement.addEventListener("click", () => {
+        // Increment the slider value and update the circle layers and bucket range text
+        const currentValue = sliderElement.value;
+        sliderElement.value = (parseInt(currentValue) + 1) % attributes.length;
+        const bin = attributes[sliderElement.value];
+        const filteredFeatures = top100Features.filter(feature => bin.values.includes(feature.properties.mag));
+        circleLayerGroup.clearLayers();
+        addGeoJSONLayer(circleLayerGroup, filteredFeatures, minMag);
+        updateMagnitudeRangeText(sliderElement, bucketRangeElement, attributes);
     });
-  }
+}
+
+// Update the bucket range text element
+function updateMagnitudeRangeText(sliderElement, bucketRangeElement, attributes) {
+    // Get the current bin and update the bucket range text
+    const bin = attributes[sliderElement.value];
+    const rangeText = `Magnitude Range: ${bin.min} - ${bin.max === Infinity ? 10 : bin.max}`;
+    bucketRangeElement.textContent = rangeText;
+}
+
