@@ -159,7 +159,7 @@ function addGeoJSONLayer(mymap, features, minMag) {
 // Create sequence controls for the map
 function createSequenceControls(mymap, top100Features, minMag, attributes) {
     // Get the slider and bucket range elements
-    const sliderElement = document.querySelector(".range-slider");
+    const sliderElement = document.querySelector(".rangeslider");
     const magBucketRangeElement = document.querySelector(".magnituderange");
     const circleLayerGroup = L.layerGroup().addTo(mymap);
     const showAllEarthquakesCheckbox = document.querySelector("#showalleqs");
@@ -191,15 +191,23 @@ function createSequenceControls(mymap, top100Features, minMag, attributes) {
 
     // Show all earthquakes when checkbox is checked
     showAllEarthquakesCheckbox.addEventListener("change", () => {
+        const leftArrowElement = document.querySelector("#leftArrow");
+        const rightArrowElement = document.querySelector("#rightArrow");
         if (showAllEarthquakesCheckbox.checked) {
             circleLayerGroup.clearLayers();
             addGeoJSONLayer(circleLayerGroup, top100Features, minMag);
+            sliderElement.disabled = true;
+            leftArrowElement.style.visibility = "hidden";
+            rightArrowElement.style.visibility = "hidden";
         } else {
             circleLayerGroup.clearLayers();
             const value = sliderElement.value;
             const bin = attributes[value % attributes.length];
             const filteredFeatures = top100Features.filter(feature => bin.values.includes(feature.properties.mag));
             addGeoJSONLayer(circleLayerGroup, filteredFeatures, minMag);
+            sliderElement.disabled = false;
+            leftArrowElement.style.visibility = "visible";
+            rightArrowElement.style.visibility = "visible";
         }
     });
 }
