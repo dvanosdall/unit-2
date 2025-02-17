@@ -5,6 +5,7 @@
  *  In the data folder in the readme file you will see the source of the data, 
  *  I will include here as well
  * * https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson
+ * * Where I got the free image for the arrow(s) https://pngtree.com/freepng/vector-arrows--arrow-icon--arrow-vector-icon--arrow--arrows-vector-collection_4294132.html
  ******************************************/
 
 // Wait until the webpage is fully loaded before running the script
@@ -53,6 +54,8 @@ function fetchGeoJSONData(mymap) {
             const minMag = Math.min(...top100Features.map(feature => feature.properties.mag));
             // console.log('Top 100 features:', top100Features);  FOR DEBUG
             addGeoJSONLayer(mymap, top100Features, minMag);
+            var attributes = processData(top100Features);
+            createSequenceControls();
         })
         .catch(error => {
             // Handle errors related to loading the GeoJSON file
@@ -62,6 +65,55 @@ function fetchGeoJSONData(mymap) {
                 console.error('An Error loading the GeoJSON data has occurred:', error);
             }
         });
+}
+
+function processData(top100Features){
+    //get the magnitude values
+    var magnitudes = top100Features.map(feature => feature.properties.mag);
+
+    //calculate the quantiles
+    var quantiles = [];
+    for (var i = 1; i <= 8; i++) {
+        quantiles.push(percentile(magnitudes, i / 8 * 100));
+    }
+
+    //create the bins
+    var bins = [];
+    for (var i = 0; i < 8; i++) {
+        bins.push({
+            min: quantiles[i],
+            max: quantiles[i + 1] || Infinity,
+            values: []
+        });
+    }
+
+    //assign the data to the bins
+    magnitudes.forEach(magnitude => {
+        for (var i = 0; i < 8; i++) {
+            if (magnitude >= bins[i].min && magnitude < bins[i].max) {
+                bins[i].values.push(magnitude);
+                break;
+            }
+        }
+    });
+
+    //check result
+    console.log(bins);
+
+    return bins;
+}
+
+//calculate the percentile
+function percentile(arr, p) {
+    arr.sort((a, b) => a - b);
+    var index = (arr.length - 1) * p / 100;
+    var lower = Math.floor(index);
+    var upper = Math.ceil(index);
+    if (upper - lower === 1) {
+        return arr[lower];
+    } else {
+        return (arr[lower] + arr[upper]) / 2;
+    }
 }
 
 // Add GeoJSON layer to the map
@@ -95,9 +147,46 @@ function addGeoJSONLayer(mymap, features, minMag) {
                      <strong>Magnitude:</strong> ${feature.properties.mag}<br>
                      <strong>Depth:</strong> ${feature.geometry.coordinates[2]} km<br>
                      <strong>Time:</strong> ${new Date(feature.properties.time).toLocaleString()}<br>
-                     <a href="${feature.properties.url}" target="_blank">More Info</a>`
+                     <a href="${feature.properties.url}" target="_blank">More Info</a>`,
+                    {
+                        offset: new L.Point(0, -layer.options.radius/3)
+                    }
                 );
             }
         }
     }).addTo(mymap);
 }
+
+function createSequenceControls() {
+    // Add event listener to slider
+    var sliderElement = document.querySelector(".range-slider");
+    sliderElement.max = 8;
+    sliderElement.min = 0;
+    sliderElement.value = 0;
+    sliderElement.step = 1;
+
+    sliderElement.addEventListener("input", function() {
+      // Update the map based on the slider value
+      var value = this.value;
+      console.log("Slider value:", value);
+      // TO DO: update the map based on the slider value
+    });
+  
+    // Add event listener to step backward button
+    var leftArrowElement = document.querySelector("#leftArrow");
+    leftArrowElement.addEventListener("click", function() {
+      var currentValue = sliderElement.value;
+      sliderElement.value = parseInt(currentValue) - 1;
+      console.log("Slider value:", sliderElement.value);
+      // TO DO: update the map based on the slider value
+    });
+  
+    // Add event listener to step forward button
+    var rightArrowElement = document.querySelector("#rightArrow");
+    rightArrowElement.addEventListener("click", function() {
+      var currentValue = sliderElement.value;
+      sliderElement.value = parseInt(currentValue) + 1;
+      console.log("Slider value:", sliderElement.value);
+      // TO DO: update the map based on the slider value
+    });
+  }
