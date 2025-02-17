@@ -48,9 +48,11 @@ function fetchGeoJSONData(mymap) {
             return response.json();
         })
         .then(data => {
-            const top100Features = data.features.slice(0, 100);
-            console.log('Top 100 features:', top100Features);
-            addGeoJSONLayer(mymap, top100Features);
+            // Some of the data is less then 0 or 0 so I filtered those out.
+            const top100Features = data.features.filter(feature => feature.properties.mag > 0).slice(0, 100);
+            const minMag = Math.min(...top100Features.map(feature => feature.properties.mag));
+            // console.log('Top 100 features:', top100Features);  FOR DEBUG
+            addGeoJSONLayer(mymap, top100Features, minMag);
         })
         .catch(error => {
             // Handle errors related to loading the GeoJSON file
@@ -63,32 +65,29 @@ function fetchGeoJSONData(mymap) {
 }
 
 // Add GeoJSON layer to the map
-function addGeoJSONLayer(mymap, features) {
+function addGeoJSONLayer(mymap, features, minMag) {
     L.geoJSON(features, {
         // Customize the point style based on earthquake magnitude
         pointToLayer: (feature, latlng) => {
             const mag = feature.properties.mag;
+            //console.log('mag:', mag); FOR DEBUG
+            //console.log('minMag:', minMag); FOR DEBUG
+            const radius = Math.max(1.0083 * Math.pow(mag/minMag, 0.5715), 5);
+            //console.log('radius:', radius); FOR DEBUG
             const color = mag > 5 ? 'red' : mag > 3 ? 'orange' : 'yellow';
+            //console.log(radius); FOR DEBUG
 
             // Create a circle marker with properties based on the magnitude
             return L.circleMarker(latlng, {
-                // Scale by magnitude
-                radius: mag * 2,
-                // Color based on magnitude
+                radius: radius,
                 fillColor: color,
-                // Border color
                 color: "#000",
-                // Border weight
                 weight: 1,
-                // Border opacity
                 opacity: 1,
-                // Fill opacity
                 fillOpacity: 0.8
             });
         },
         // Add popup to each feature showing earthquake details
-        // there is a bunch of info so we are going to dsiplay the important eq data 
-        // the more info is really neat since the usgs has the url in teh data set
         onEachFeature: (feature, layer) => {
             if (feature.properties) {
                 layer.bindPopup(
