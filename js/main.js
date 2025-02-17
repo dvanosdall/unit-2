@@ -160,7 +160,7 @@ function addGeoJSONLayer(mymap, features, minMag) {
 function createSequenceControls(mymap, top100Features, minMag, attributes) {
     // Get the slider and bucket range elements
     const sliderElement = document.querySelector(".range-slider");
-    const bucketRangeElement = document.querySelector(".magnituderange");
+    const magBucketRangeElement = document.querySelector(".magnituderange");
     const circleLayerGroup = L.layerGroup().addTo(mymap);
     const showAllEarthquakesCheckbox = document.querySelector("#showalleqs");
 
@@ -168,10 +168,10 @@ function createSequenceControls(mymap, top100Features, minMag, attributes) {
     initializeSlider(sliderElement, attributes);
 
     // Add event listeners to the slider and arrow buttons
-    addEventListeners(sliderElement, circleLayerGroup, bucketRangeElement, top100Features, minMag, attributes);
+    addEventListeners(sliderElement, circleLayerGroup, magBucketRangeElement, top100Features, minMag, attributes);
 
     // Update the bucket range text initially
-    updateMagnitudeRangeText(sliderElement, bucketRangeElement, attributes);
+    updateMagnitudeRangeText(sliderElement, magBucketRangeElement, attributes);
 
     // Add initial circle layers to the map
     const initialBin = attributes[0];
@@ -214,7 +214,7 @@ function initializeSlider(sliderElement, attributes) {
 }
 
 // Add event listeners to the slider and arrow buttons
-function addEventListeners(sliderElement, circleLayerGroup, bucketRangeElement, top100Features, minMag, attributes) {
+function addEventListeners(sliderElement, circleLayerGroup, magBucketRangeElement, top100Features, minMag, attributes) {
     // Add event listener to the slider
     sliderElement.addEventListener("input", () => {
         // Get the current slider value and corresponding bin
@@ -229,7 +229,7 @@ function addEventListeners(sliderElement, circleLayerGroup, bucketRangeElement, 
         addGeoJSONLayer(circleLayerGroup, filteredFeatures, minMag);
 
         // Update the bucket range text
-        updateMagnitudeRangeText(sliderElement, bucketRangeElement, attributes);
+        updateMagnitudeRangeText(sliderElement, magBucketRangeElement, attributes);
     });
 
     // Add event listener to the left arrow button
@@ -242,7 +242,7 @@ function addEventListeners(sliderElement, circleLayerGroup, bucketRangeElement, 
         const filteredFeatures = top100Features.filter(feature => bin.values.includes(feature.properties.mag));
         circleLayerGroup.clearLayers();
         addGeoJSONLayer(circleLayerGroup, filteredFeatures, minMag);
-        updateMagnitudeRangeText(sliderElement, bucketRangeElement, attributes);
+        updateMagnitudeRangeText(sliderElement, magBucketRangeElement, attributes);
     });
 
     // Add event listener to the right arrow button
@@ -255,15 +255,15 @@ function addEventListeners(sliderElement, circleLayerGroup, bucketRangeElement, 
         const filteredFeatures = top100Features.filter(feature => bin.values.includes(feature.properties.mag));
         circleLayerGroup.clearLayers();
         addGeoJSONLayer(circleLayerGroup, filteredFeatures, minMag);
-        updateMagnitudeRangeText(sliderElement, bucketRangeElement, attributes);
+        updateMagnitudeRangeText(sliderElement, magBucketRangeElement, attributes);
     });
 }
 
 // Update the bucket range text element
-function updateMagnitudeRangeText(sliderElement, bucketRangeElement, attributes) {
+function updateMagnitudeRangeText(sliderElement, magBucketRangeElement, attributes) {
     // Get the current bin and update the bucket range text
     const bin = attributes[sliderElement.value];
     const rangeText = `Magnitude Range: ${bin.min} - ${bin.max === Infinity ? 10 : bin.max}`;
-    bucketRangeElement.textContent = rangeText;
+    magBucketRangeElement.textContent = rangeText;
 }
 
